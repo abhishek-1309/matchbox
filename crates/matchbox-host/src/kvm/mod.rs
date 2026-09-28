@@ -13,7 +13,13 @@ pub struct VmInstance {
     pub vm_id: u32,
     pub mem_size: usize,
     pub mem: *mut u8,
+    pub hc_frame: *mut HypercallFrame,
 }
+
+use crate::hypercalls::HypercallFrame;
+
+// Guest physical address of the hypercall frame
+const HYPERCALL_GPA: u64 = 0x2000_0000;
 
 impl Hypervisor {
     pub fn new() -> Result<Self> {
@@ -54,7 +60,7 @@ impl Hypervisor {
         // Set up page tables at 0x1000, 0x2000, 0x3000
         setup_page_tables(mem);
 
-        // Register memory slot
+        // Register main memory slot (GPA 0)
         let mem_region = kvm_userspace_memory_region {
             slot: 0,
             flags: 0,
@@ -66,14 +72,41 @@ impl Hypervisor {
             vm_fd.set_user_memory_region(mem_region)?;
         }
 
+        // Allocate and register hypercall frame (GPA 0x2000_0000)
+        let hc_mem = unsafe {
+            let ptr = libc::mmap(
+                std::ptr::null_mut(),
+                4096,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                -1,
+                0,
+            );
+            if ptr == libc::MAP_FAILED {
+                anyhow::bail!("hc mmap failed: {}", std::io::Error::last_os_error());
+            }
+            std::ptr::write_bytes(ptr, 0, 4096);
+            ptr as *mut u8
+        };
+        let hc_region = kvm_userspace_memory_region {
+            slot: 1,
+            flags: 0,
+            guest_phys_addr: HYPERCALL_GPA,
+            memory_size: 4096,
+            userspace_addr: hc_mem as u64,
+        };
+        unsafe {
+            vm_fd.set_user_memory_region(hc_region)?;
+        }
+
         // Create vCPU and set registers
         let vcpu_fd = vm_fd.create_vcpu(0)?;
 
         let mut sregs = vcpu_fd.get_sregs()?;
-        sregs.cr3 = 0x1000; // PML4 at physical addr 0x1000
-        sregs.cr4 |= 0x20;  // PAE
-        sregs.cr0 = 0x80000001; // PE | PG
-        sregs.efer = 0x500; // LME | LMA
+        sregs.cr3 = 0x1000;
+        sregs.cr4 |= 0x20;
+        sregs.cr0 = 0x80000001;
+        sregs.efer = 0x500;
         vcpu_fd.set_sregs(&sregs)?;
 
         let mut regs = vcpu_fd.get_regs()?;
@@ -87,6 +120,7 @@ impl Hypervisor {
             vm_id,
             mem_size,
             mem,
+            hc_frame: hc_mem as *mut HypercallFrame,
         })
     }
 }
@@ -96,6 +130,11 @@ impl Drop for VmInstance {
         if !self.mem.is_null() {
             unsafe {
                 libc::munmap(self.mem as *mut libc::c_void, self.mem_size);
+            }
+        }
+        if !self.hc_frame.is_null() {
+            unsafe {
+                libc::munmap(self.hc_frame as *mut libc::c_void, 4096);
             }
         }
     }
