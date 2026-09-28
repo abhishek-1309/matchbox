@@ -11,7 +11,7 @@ const HYPERCALL_GPA: u64 = 0x300000;
 type HvVcpu = u64;
 
 #[link(name = "Hypervisor", kind = "framework")]
-extern "C" {
+unsafe extern "C" {
     fn hv_vm_create(options: u64) -> i32;
     fn hv_vm_destroy() -> i32;
     fn hv_vm_map(addr: *const u8, gpa: u64, size: u64, flags: u64) -> i32;
