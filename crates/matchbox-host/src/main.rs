@@ -1,3 +1,6 @@
+pub mod security;
+pub mod hypercalls;
+
 #[cfg(target_os = "linux")]
 pub mod kvm;
 
@@ -6,12 +9,6 @@ pub mod scheduler;
 
 #[cfg(target_os = "linux")]
 pub mod memory;
-
-#[cfg(target_os = "linux")]
-pub mod hypercalls;
-
-#[cfg(target_os = "linux")]
-pub mod security;
 
 #[cfg(target_os = "linux")]
 mod host_main;
