@@ -1,15 +1,9 @@
 fn main() {
-    #[cfg(target_arch = "x86_64")]
-    {
-        // Assemble the boot stub
-        cc::Build::new()
-            .file("src/boot.S")
-            .target("x86_64-unknown-none")
-            .compile("boot");
-    }
+    let target = std::env::var("TARGET").unwrap_or_default();
 
-    // Pass the linker script to rustc
-    #[cfg(target_arch = "x86_64")]
-    println!("cargo:rustc-link-arg=-T{}/linker.ld",
-        std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    // Custom linker script for bare-metal targets
+    if target == "x86_64-unknown-none" || target == "x86_64-unknown-elf" {
+        println!("cargo:rustc-link-arg=-T{}/linker.ld",
+            std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    }
 }

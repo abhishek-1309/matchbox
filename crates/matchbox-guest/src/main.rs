@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![cfg_attr(target_arch = "x86_64", feature(asm_experimental_arch))]
 
 #[cfg(target_arch = "x86_64")]
 mod hypercall;

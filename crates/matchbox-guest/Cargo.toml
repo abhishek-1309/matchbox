@@ -2,15 +2,16 @@
 name = "matchbox-guest"
 version = "0.1.0"
 edition = "2024"
-build = "build.rs"
 
 [package.metadata]
-# Build with: cargo +nightly build -Zbuild-std=core,compiler_builtins --target x86_64-unknown-none -p matchbox-guest
+# Build the guest binary on an x86_64 Linux host:
+#   cargo +nightly build -Zbuild-std --target x86_64-unknown-none -p matchbox-guest
+# Then extract the raw binary:
+#   llvm-objcopy -O binary target/x86_64-unknown-none/debug/matchbox-guest guest.bin
 
 [dependencies]
 
 [build-dependencies]
-cc = "1"
 
 [profile.release]
 panic = "abort"
