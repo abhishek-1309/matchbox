@@ -1,6 +1,10 @@
-# Matchbox
+<p align="center">
+  <img src="docs/icon.svg" width="128" alt="Matchbox logo"/>
+</p>
 
-**M:N Fiber-Scheduled MicroVM Engine** — Lightweight, capability-isolated micro-VMs for AI agent workloads.
+<h1 align="center">Matchbox</h1>
+
+<p align="center"><strong>M:N Fiber-Scheduled MicroVM Engine</strong> — Lightweight, capability-isolated micro-VMs for AI agent workloads.</p>
 
 ```
                     ┌───────────────────────────────┐
