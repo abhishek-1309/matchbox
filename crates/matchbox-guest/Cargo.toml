@@ -1,0 +1,18 @@
+[package]
+name = "matchbox-guest"
+version = "0.1.0"
+edition = "2021"
+
+[package.metadata]
+# This crate requires nightly and x86_64-unknown-none target.
+# Build with: cargo +nightly build -Zbuild-std=core,compiler_builtins --target x86_64-unknown-none
+
+[dependencies]
+
+[build-dependencies]
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
