@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icon.svg" width="128" alt="Matchbox logo"/>
+  <img src="docs/matchbox.png" width="128" alt="Matchbox logo"/>
 </p>
 
 <h1 align="center">Matchbox</h1>
