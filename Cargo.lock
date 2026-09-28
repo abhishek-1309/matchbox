@@ -666,6 +666,7 @@ dependencies = [
  "crossbeam-utils",
  "kvm-bindings",
  "kvm-ioctls",
+ "libc",
  "memfd",
  "nix",
  "reqwest",

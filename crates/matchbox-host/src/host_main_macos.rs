@@ -10,12 +10,14 @@ pub fn main() -> anyhow::Result<()> {
         .with_ansi(true)
         .init();
 
-    // ARM64 guest: do HVC to trigger exit, then loop
+    // ARM64 guest: load from unmapped address to force stage-2 fault exit
+    //   mov x0, #0x100000000  (4GB - outside mapped 4MB)
+    //   ldr x0, [x0]          (should cause stage-2 fault)
+    //   b _start
     let guest_code: &[u8] = &[
         0x00, 0x00, 0x80, 0xd2, // mov x0, #0
-        0x01, 0x00, 0x00, 0xd4, // hvc #0
-        0x00, 0x00, 0x80, 0x52, // mov w0, #0 (prepare for next hvc)
-        0x01, 0x00, 0x00, 0xd4, // hvc #1 (exit with another hvc)
+        0x60, 0x00, 0x80, 0x92, // movk x0, #3, lsl #32  (x0 = 0x300000000)
+        0x00, 0x00, 0x40, 0xf9, // ldr x0, [x0]  (fault!)
         0xfd, 0xff, 0xff, 0x17, // b _start
     ];
 

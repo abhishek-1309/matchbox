@@ -19,9 +19,18 @@ mod host_main;
 #[cfg(target_os = "linux")]
 use host_main as impl_main;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+pub mod hv;
+
+#[cfg(target_os = "macos")]
+mod host_main_macos;
+
+#[cfg(target_os = "macos")]
+use host_main_macos::main as impl_main;
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn impl_main() -> anyhow::Result<()> {
-    anyhow::bail!("matchbox-host requires Linux with /dev/kvm")
+    anyhow::bail!("matchbox-host requires Linux (/dev/kvm) or macOS (Hypervisor.framework)")
 }
 
 fn main() -> anyhow::Result<()> {
