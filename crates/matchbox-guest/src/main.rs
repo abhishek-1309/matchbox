@@ -6,12 +6,21 @@ mod hypercall;
 
 use core::panic::PanicInfo;
 
+#[cfg(target_arch = "x86_64")]
+#[unsafe(link_section = ".text.entry")]
 #[unsafe(no_mangle)]
 pub extern "C" fn _rust_entry() -> ! {
+    let _ = hypercall::fs::mkdir("demo");
+    hypercall::hypercall(hypercall::Command::Exit);
     loop {
-        #[cfg(target_arch = "x86_64")]
-        unsafe { core::arch::asm!("hlt"); }
+        unsafe { core::arch::asm!("hlt", options(nomem, nostack)); }
     }
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+#[unsafe(no_mangle)]
+pub extern "C" fn _rust_entry() -> ! {
+    loop {}
 }
 
 #[panic_handler]

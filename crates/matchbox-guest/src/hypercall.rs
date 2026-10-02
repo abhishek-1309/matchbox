@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use core::arch::asm;
 
 const HYPERCALL_FRAME_ADDR: u64 = 0x2000_0000;
@@ -35,12 +37,13 @@ pub fn hypercall(cmd: Command) {
     frame.command_id = cmd as u32;
     frame.status = 0;
 
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
     unsafe {
         asm!(
-            "outl %eax, %dx",
+            "out dx, eax",
             in("eax") cmd as u32,
             in("dx") HYPERCALL_PORT,
-            options(nomem, nostack),
+            options(nostack),
         );
     }
 }

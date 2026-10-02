@@ -14,20 +14,8 @@ pub fn main() -> anyhow::Result<()> {
     tracing::info!("jail root: {}", jail.display());
 
     let hypervisor = kvm::Hypervisor::new()?;
-
-    // Long mode, identity-mapped. Write CMD_EXIT into the hypercall frame at
-    // GPA 0x20000000, then trap on port 0x3F0.
-    let guest_code: &[u8] = &[
-        0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, // mov rax, 0x20000000
-        0xc7, 0x00, 0x05, 0x00, 0x00, 0x00,                         // mov dword [rax], 5
-        0xb8, 0x05, 0x00, 0x00, 0x00,                               // mov eax, 5 (CMD_EXIT)
-        0xba, 0xf0, 0x03, 0x00, 0x00,                               // mov edx, 0x3F0
-        0xef,                                                       // out dx, eax
-        0xf4,                                                       // hlt
-        0xeb, 0xfc,                                                 // jmp -4
-    ];
-
-    let mut vm = hypervisor.create_vm(0, 0x400000, guest_code)?;
+    let golden = crate::memory::GoldenMaster::bootstrap(&hypervisor)?;
+    let mut vm = hypervisor.create_vm(0, &golden)?;
     tracing::info!("VM-0 running...");
 
     loop {

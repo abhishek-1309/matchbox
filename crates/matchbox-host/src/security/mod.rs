@@ -80,10 +80,20 @@ pub fn resolve_creatable_path(jail_root: &Path, guest_path_str: &str) -> Result<
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
     fn tmp_root() -> PathBuf {
-        let p = std::env::temp_dir().join("matchbox_test_security");
-        let _ = fs::remove_dir_all(&p);
+        let p = std::env::temp_dir().join(format!(
+            "matchbox_test_security_{}_{}_{}",
+            std::process::id(),
+            TEMP_SEQ.fetch_add(1, Ordering::Relaxed),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
         fs::create_dir_all(&p).unwrap();
         p.canonicalize().unwrap_or(p)
     }

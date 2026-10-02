@@ -1,5 +1,6 @@
 pub mod security;
 pub mod hypercalls;
+pub mod guest_image;
 
 #[cfg(target_os = "linux")]
 pub mod kvm;

@@ -18,6 +18,9 @@ impl Scheduler {
         golden_master: GoldenMaster,
         jail_root: std::path::PathBuf,
     ) -> Result<()> {
+        let _ = (&hypervisor, &golden_master);
+        tracing::info!("scheduler jail: {}", jail_root.display());
+
         let injector = Arc::new(Injector::<VcpuFiber>::new());
         let num_workers = std::thread::available_parallelism()
             .map(|n| n.get())
@@ -50,20 +53,14 @@ impl Scheduler {
 }
 
 fn worker_loop(
-    worker_id: usize,
+    _worker_id: usize,
     local: Worker<VcpuFiber>,
     injector: Arc<Injector<VcpuFiber>>,
-    stealers: Vec<Stealer<VcpuFiber>>,
+    _stealer: Stealer<VcpuFiber>,
 ) {
     loop {
         // Find a task: check local queue first, then steal
-        let fiber = local
-            .pop()
-            .or_else(|| {
-                // Try to steal from another worker
-                // Simplified: just pop from injector
-                injector.steal_batch_and_pop(&local)
-            });
+        let fiber = local.pop().or_else(|| injector.steal_batch_and_pop(&local).success());
 
         match fiber {
             Some(mut fiber) => {
@@ -72,11 +69,8 @@ fn worker_loop(
                         // Execute guest until VM-Exit
                         // This will block the OS thread.
                         // In future: signal-based preemption.
-                        match run_vcpu(&mut fiber) {
-                            Ok(exit) => handle_exit(&mut fiber, exit, &local, &injector),
-                            Err(e) => {
-                                tracing::error!("VM-{} error: {}", fiber.vm_id, e);
-                            }
+                        if let Err(e) = drive_fiber(&mut fiber) {
+                            tracing::error!("VM-{} error: {}", fiber.vm_id, e);
                         }
                     }
                     vcpu_fiber::FiberState::BlockedOnIo(_) => {
@@ -98,40 +92,31 @@ fn worker_loop(
     }
 }
 
-fn run_vcpu(fiber: &mut VcpuFiber) -> Result<kvm_ioctls::VcpuExit> {
-    use std::os::unix::io::AsRawFd;
-    let ret = unsafe {
-        libc::ioctl(fiber.vcpu_fd.as_raw_fd(), kvm_ioctls::KVM_RUN)
-    };
-    if ret != 0 {
-        anyhow::bail!("KVM_RUN failed: {}", std::io::Error::last_os_error());
-    }
-    Ok(fiber.vcpu_fd.get_run().exit_reason)
+enum ExitKind {
+    Hypercall,
+    Hlt,
+    Shutdown,
+    Other,
 }
 
-fn handle_exit(
-    fiber: &mut VcpuFiber,
-    exit: kvm_ioctls::VcpuExit,
-    _local: &Worker<VcpuFiber>,
-    _injector: &Injector<VcpuFiber>,
-) {
-    match exit {
-        kvm_ioctls::VcpuExit::IoOut { port, data, .. } => {
-            if port == 0x3F0 {
-                // Hypercall trap
-                // Decode and handle
-                tracing::debug!("VM-{}: hypercall via port 0x3F0: data={:x}", fiber.vm_id, data);
-            }
-            fiber.state = vcpu_fiber::FiberState::Runnable;
+fn drive_fiber(fiber: &mut VcpuFiber) -> Result<()> {
+    let vm_id = fiber.vm_id;
+    let kind = match fiber.vcpu_fd.run()? {
+        kvm_ioctls::VcpuExit::IoOut(port, data) if port == 0x3F0 => {
+            tracing::debug!("VM-{vm_id}: hypercall via port 0x3F0: {} bytes", data.len());
+            ExitKind::Hypercall
         }
-        kvm_ioctls::VcpuExit::Hlt => {
-            fiber.state = vcpu_fiber::FiberState::Terminated(0);
+        kvm_ioctls::VcpuExit::Hlt => ExitKind::Hlt,
+        kvm_ioctls::VcpuExit::Shutdown => ExitKind::Shutdown,
+        other => {
+            tracing::debug!("VM-{vm_id}: exit {other:?}");
+            ExitKind::Other
         }
-        kvm_ioctls::VcpuExit::Shutdown => {
-            fiber.state = vcpu_fiber::FiberState::Terminated(-1);
-        }
-        _ => {
-            fiber.state = vcpu_fiber::FiberState::Runnable;
-        }
-    }
+    };
+    fiber.state = match kind {
+        ExitKind::Hlt => vcpu_fiber::FiberState::Terminated(0),
+        ExitKind::Shutdown => vcpu_fiber::FiberState::Terminated(-1),
+        ExitKind::Hypercall | ExitKind::Other => vcpu_fiber::FiberState::Runnable,
+    };
+    Ok(())
 }

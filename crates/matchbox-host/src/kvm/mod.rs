@@ -1,6 +1,7 @@
 use anyhow::Result;
 use kvm_bindings::*;
-use kvm_ioctls::{Kvm, VmFd, VcpuFd};
+pub use kvm_ioctls::VcpuFd;
+use kvm_ioctls::{Kvm, VmFd};
 use std::os::unix::io::AsRawFd;
 
 pub struct Hypervisor {
@@ -31,19 +32,19 @@ impl Hypervisor {
     pub fn create_vm(
         &self,
         vm_id: u32,
-        mem_size: usize,
-        guest_code: &[u8],
+        master: &crate::memory::GoldenMaster,
     ) -> Result<VmInstance> {
         let vm_fd = self.kvm.create_vm()?;
+        let mem_size = master.size;
 
-        // Allocate guest memory with mmap
+        // CoW mapping of the golden master. Page-table writes dirty only those pages.
         let mem = unsafe {
             let ptr = libc::mmap(
                 std::ptr::null_mut(),
                 mem_size,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                -1,
+                libc::MAP_PRIVATE,
+                master.memfd.as_file().as_raw_fd(),
                 0,
             );
             if ptr == libc::MAP_FAILED {
@@ -51,11 +52,6 @@ impl Hypervisor {
             }
             ptr as *mut u8
         };
-
-        // Copy guest code into guest memory at offset 0
-        unsafe {
-            std::ptr::copy_nonoverlapping(guest_code.as_ptr(), mem, guest_code.len());
-        }
 
         // Set up page tables at 0x1000, 0x2000, 0x3000
         setup_page_tables(mem);
@@ -110,7 +106,8 @@ impl Hypervisor {
         vcpu_fd.set_sregs(&sregs)?;
 
         let mut regs = vcpu_fd.get_regs()?;
-        regs.rip = 0;
+        regs.rip = crate::guest_image::GUEST_LOAD_GPA;
+        regs.rsp = crate::guest_image::GUEST_STACK_GPA;
         regs.rflags = 2;
         vcpu_fd.set_regs(&regs)?;
 

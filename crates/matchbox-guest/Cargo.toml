@@ -4,10 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [package.metadata]
-# Build the guest binary on an x86_64 Linux host:
-#   cargo +nightly build -Zbuild-std --target x86_64-unknown-none -p matchbox-guest
-# Then extract the raw binary:
-#   llvm-objcopy -O binary target/x86_64-unknown-none/debug/matchbox-guest guest.bin
+# Rebuild crates/matchbox-guest/guest.bin (needs the x86_64-unknown-none target):
+#   python3 scripts/build-guest-image.py
 
 [dependencies]
 

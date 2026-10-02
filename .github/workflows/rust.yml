@@ -15,6 +15,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install guest target
+      run: rustup target add x86_64-unknown-none
+    - name: Rebuild guest image from source
+      run: python3 scripts/build-guest-image.py
     - name: Build
       run: cargo build --verbose
     - name: Run tests
