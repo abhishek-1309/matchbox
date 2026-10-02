@@ -12,7 +12,7 @@ crossbeam-deque = "0.8"
 crossbeam-utils = "0.8"
 memfd = "0.6"
 nix = "0.31"
-reqwest = { version = "0.13", features = ["rustls"] }
+reqwest = { version = "0.13", features = ["blocking", "rustls"] }
 tokio = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

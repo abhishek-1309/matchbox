@@ -1,3 +1,9 @@
+mod handlers;
+
+pub use handlers::{
+    dispatch, ERR_FAULT, ERR_HTTP, ERR_INVAL, ERR_IO, ERR_SECURITY, OK,
+};
+
 use anyhow::Result;
 
 #[repr(u32)]
